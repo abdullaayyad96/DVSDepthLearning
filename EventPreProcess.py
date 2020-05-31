@@ -157,3 +157,14 @@ class EventPreProcess:
             multiplied_images.append(np.multiply(image_list_1[i], image_list_2[i]))
         
         return multiplied_images
+
+
+    def FlipImages(image_list, axis=0):
+        #flip image vertically (axis=0) or horizontally (axis=1)
+
+        flipped_image_list = []
+
+        for image in image_list:
+            flipped_image_list.append(np.flip(image, axis))
+
+        return flipped_image_list
