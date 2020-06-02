@@ -229,6 +229,26 @@ class DlModels:
         return pool_5, conv5_3, conv4_3, conv3_3, conv2_2, conv1_2
 
     
+    def Conv2Dx1(input_tensor):
+        #Layer 1: Convolutional
+        conv1_1 = tf2.keras.layers.TimeDistributed(tf.layers.Conv2D(kernel_size=3, filters=32, strides=1, padding='same', 
+                    kernel_initializer=tf2.keras.initializers.Orthogonal(), bias_initializer=tf2.keras.initializers.GlorotNormal(),
+                    kernel_regularizer=tf2.keras.regularizers.l2(), bias_regularizer=tf2.keras.regularizers.l2(), activation='relu',
+                    name='conv1_1'))(input_tensor)
+
+        #pooling function
+        pool_1 = tf2.keras.layers.TimeDistributed(tf.layers.MaxPooling2D(pool_size=2, strides=2, padding='same', name='pool_1'))(conv1_1)
+
+        #Layer 2: Convolutional
+        conv2_1 = tf2.keras.layers.TimeDistributed(tf.layers.Conv2D(kernel_size=3, filters=64, strides=1, padding='same', 
+                    kernel_initializer=tf2.keras.initializers.Orthogonal(), bias_initializer=tf2.keras.initializers.GlorotNormal(),
+                    kernel_regularizer=tf2.keras.regularizers.l2(), bias_regularizer=tf2.keras.regularizers.l2(), activation='relu',
+                    name='conv2_1'))(pool_1)
+
+        #pooling function
+        pool_2 = tf2.keras.layers.TimeDistributed(tf.layers.MaxPooling2D(pool_size=2, strides=2, padding='same', name='pool_2'))(conv2_1)
+
+        return pool_2, conv2_1, conv1_1
 
     def vggDecoder(input_tensor, encoder):
         encoder_output, layer5, layer4, layer3, layer2, layer1 = encoder(input_tensor)
@@ -311,37 +331,21 @@ class DlModels:
         return output_layer
 
 
-        def vggDecoder(input_tensor, encoder):
-        encoder_output, layer5, layer4, layer3, layer2, layer1 = encoder(input_tensor)
+    def Conv2dx2LSTMDecoder(input_tensor, encoder=Conv2Dx1):
 
-        #1x1 convolutions 1
-        conv1x1_1 = tf.layers.Conv2D(kernel_size=1, filters=256, strides=1, padding='same',
-                        kernel_initializer=tf2.keras.initializers.GlorotNormal(), bias_initializer=tf2.keras.initializers.GlorotNormal(),
-                        kernel_regularizer=tf2.keras.regularizers.l2(), activation='relu', 
-                        name='conv1x1_1')(encoder_output)
+        encoder_output, layer2, layer1 = encoder(input_tensor)
 
+        #Convolutional LSTM
+        LSTMLayer = tf2.keras.layers.ConvLSTM2D(filters = 64, kernel_size=2, padding='same', activation='relu')(encoder_output)
         
-        #1x1 convolutions 2
-        conv1x1_2 = tf.layers.Conv2D(kernel_size=1, filters=128, strides=1, padding='same',
-                        kernel_initializer=tf2.keras.initializers.GlorotNormal(), bias_initializer=tf2.keras.initializers.GlorotNormal(),
-                        kernel_regularizer=tf2.keras.regularizers.l2(), activation='relu',
-                        name='conv1x1_2')(conv1x1_1)
-
-        #1x1 convolutions 3
-        conv1x1_3 = tf.layers.Conv2D(kernel_size=1, filters=64, strides=1, padding='same',
-                        kernel_initializer=tf2.keras.initializers.GlorotNormal(), bias_initializer=tf2.keras.initializers.GlorotNormal(),
-                        kernel_regularizer=tf2.keras.regularizers.l2(), activation='relu',
-                        name='conv1x1_3')(conv1x1_2)
-
-
         #Deconvolution 1
         deconv_1 = tf2.keras.layers.Conv2DTranspose(kernel_size=2, filters=32, strides=2, padding='same',
                         kernel_initializer=tf2.keras.initializers.GlorotNormal(), bias_initializer=tf2.keras.initializers.GlorotNormal(),
                         kernel_regularizer=tf2.keras.regularizers.l2(), 
-                        name='deconv_1')(conv1x1_3)
-                        
+                        name='deconv_1')(LSTMLayer)
+
         #Skipping layer 1
-        skip_1 = tf2.keras.layers.Concatenate(name='skip_1')([deconv_1, layer5])
+        skip_1 = tf2.keras.layers.Concatenate(name='skip_1')([deconv_1, layer2[:, -1, :, :, :]])
 
         #Deconvolution 2
         deconv_2 = tf2.keras.layers.Conv2DTranspose(kernel_size=3, filters=32, strides=2, padding='same',
@@ -350,43 +354,13 @@ class DlModels:
                         name='deconv_2')(skip_1)    
                         
         #Skipping layer 2
-        skip_2 = tf2.keras.layers.Concatenate(name='skip_2')([deconv_2, layer4])
-
-        #Deconvolution 3
-        deconv_3 = tf2.keras.layers.Conv2DTranspose(kernel_size=4, filters=16, strides=2, padding='same',
-                        kernel_initializer=tf2.keras.initializers.Orthogonal(), bias_initializer=tf2.keras.initializers.GlorotNormal(),
-                        kernel_regularizer=tf2.keras.regularizers.l2(),
-                        name='deconv_3')(skip_2)
-
-        
-        #Skipping layer 3
-        skip_3 = tf2.keras.layers.Concatenate(name='skip_3')([deconv_3, layer3])
-
-        #Deconvolution 4
-        deconv_4 = tf2.keras.layers.Conv2DTranspose(kernel_size=4, filters=8, strides=2, padding='same',
-                        kernel_initializer=tf2.keras.initializers.Orthogonal(), bias_initializer=tf2.keras.initializers.GlorotNormal(),
-                        kernel_regularizer=tf2.keras.regularizers.l2(),
-                        name='deconv_4')(skip_3)
-        
-        #Skipping layer 4
-        skip_4 = tf2.keras.layers.Concatenate(name='skip_4')([deconv_4, layer2])
-
-
-        #Deconvolution 5
-        deconv_5 = tf2.keras.layers.Conv2DTranspose(kernel_size=5, filters=8, strides=2, padding='same',
-                        kernel_initializer=tf2.keras.initializers.Orthogonal(), bias_initializer=tf2.keras.initializers.GlorotNormal(),
-                        kernel_regularizer=tf2.keras.regularizers.l2(),
-                        name='deconv_5')(skip_4)
-        
-        #Skipping layer 5
-        skip_5 = tf2.keras.layers.Concatenate(name='skip_5')([deconv_5, layer1])
-
+        skip_2 = tf2.keras.layers.Concatenate(name='skip_2')([deconv_2, layer1[:, -1, :, :, :]])
 
         #Final layers
         output_layer = tf.layers.Conv2D(kernel_size=5, filters=1, strides=1, padding='same',
                         kernel_initializer=tf2.keras.initializers.Orthogonal(), bias_initializer=tf2.keras.initializers.GlorotNormal(),
                         kernel_regularizer=tf2.keras.regularizers.l2(), 
-                        name='output_layer')(skip_5)
+                        name='output_layer')(skip_2)
 
 
         return output_layer
